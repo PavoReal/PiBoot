@@ -15,6 +15,7 @@ extern void start_mmu ( unsigned int, unsigned int );
 extern void stop_mmu ( void );
 extern void invalidate_tlbs ( void );
 extern void invalidate_caches ( void );
+extern void enable_irq(void);
 
 u64
 GetSystemTimer(void)
@@ -120,7 +121,21 @@ unsigned int mmu_small ( unsigned int vadd, unsigned int padd, unsigned int flag
 void
 c_irq_handler(void)
 {
+    while(1) 
+    {
+        if ((*AUX_MU_IIR & _AUX_MU_IO_REG_INT_PENDING_MASK))
+        {
+            break;
+        }
 
+        if (*AUX_MU_IIR & _AUX_MU_IO_REG_RX_MASK)
+        {
+            // We've received a byte of data
+            char c = *AUX_MU_IO;
+            UART_Flush();
+            UART_Printf("Received: %c\n", c);
+        }
+    }
 }
 
 int 
@@ -141,9 +156,13 @@ start()
 
     start_mmu(MMUTABLEBASE,0x00000001|0x1000|0x0004); //[23]=0 subpages enabled = legacy ARMv4,v5 and v6
 
+    enable_irq();
+
     while (1)
     {
         UART_Printf("Ping\n");
+        DelayS(1);
+        UART_Printf("Pong\n");
         DelayS(1);
     }
 
