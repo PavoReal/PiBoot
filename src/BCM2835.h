@@ -155,6 +155,7 @@ static volatile u8 * const AUX_ENABLES = (u8*) AUX_ENABLES_ADDR;
 #define _AUX_MU_LSR_TRANS_EMPTY_MASK (0x20)
 
 #define _AUX_ME_LSR_DATA_READY_MASK (0x01)
+#define _AUX_ME_LSR_DATA_READY_POSITION (0x00)
 
 #define _AUX_ME_LSR_TRANS_IDLE_MASK (0x40)
 

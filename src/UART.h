@@ -35,4 +35,7 @@ UART_GetS(char *str);
 extern void
 UART_Flush(void);
 
+extern u8
+UART_IsInput(void);
+
 #endif

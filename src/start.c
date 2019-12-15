@@ -158,12 +158,36 @@ start()
 
     enable_irq();
 
+    SetGPIOMode(GPIO_LED, GPIO_OUTPUT);
+
+    UART_Flush();
+
+    while (UART_IsInput())
+    {
+        UART_GetC();
+    }
+
+    char inputBuffer[512];
     while (1)
     {
-        UART_Printf("Ping\n");
+        UART_Printf("Ping\r\n");
         DelayS(1);
-        UART_Printf("Pong\n");
+        UART_Printf("Pong\r\n");
         DelayS(1);
+
+        if (UART_IsInput() != 0)
+        {
+            ClearGPIO(GPIO_LED);
+
+            u32 len = UART_GetS(inputBuffer);
+
+            UART_PutB(inputBuffer, len);
+            UART_PutNewline();
+
+            DelayS(1);
+
+            SetGPIO(GPIO_LED);
+        }
     }
 
     return EXIT_SUCCESS;

@@ -58,10 +58,10 @@
 #define GPIO_52 (52)
 #define GPIO_53 (53)
 
-#define GPIO_LED GPIO_47
+#define GPIO_LED (GPIO_47)
 
-#define GPIO_OUTPUT GPIO_PIN_OUTPUT
-#define GPIO_INPUT GPIO_PIN_INPUT
+#define GPIO_OUTPUT (GPIO_PIN_OUTPUT)
+#define GPIO_INPUT (GPIO_PIN_INPUT)
 #define GPIO_ALT5 (2)
 
 void

@@ -92,16 +92,14 @@ UART_GetS(char *str)
 	{
 		c = UART_GetC();
 
-		if (c != '\r')
+		if (c != '\0')
 		{
 			*str++ = c;
 			++count;
-			UART_PutC(c);
 		}
 		else
 		{
 			done = true;
-			UART_PutNewline();
 		}
 	}
 
@@ -117,4 +115,14 @@ UART_Flush(void)
 	{
 		nop();
 	}
+}
+
+u8
+UART_IsInput(void)
+{
+	u8 result = 0;
+
+	result = (*AUX_MU_LSR & _AUX_ME_LSR_DATA_READY_MASK);
+
+	return result;
 }
