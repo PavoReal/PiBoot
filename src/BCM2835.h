@@ -28,6 +28,8 @@
 /// @{
 ///
 
+#define GLOBAL static
+
 /// 8 bit signed int
 typedef int8_t s8;
 
@@ -163,6 +165,10 @@ static volatile u8 * const AUX_ENABLES = (u8*) AUX_ENABLES_ADDR;
 #define _AUX_MU_IO_REG_INT_ID_MASK (0x06)
 #define _AUX_MU_IO_REG_RX_MASK (0x04)
 #define _AUX_MU_IO_REG_TX_EMPTY_MASK (0x02)
+
+#define _AUX_ME_IIR_REG_ENABLE_RX_INT_MASK     (0x02)
+#define _AUX_ME_IIR_REG_ENABLE_RX_INT_POSITION (0x01)
+#define _AUX_ME_IIR_REG_ENABLE_RX_INT_LENGTH   (0x01)
 
 static volatile u8 * const AUX_MU_IO       = (u8*) AUX_MU_IO_REG_ADDR;
 static volatile u8 * const AUX_MU_IER      = (u8*) AUX_MU_IER_ADDR;
@@ -418,8 +424,12 @@ static volatile u32 * const ARM_TIMER_FREE_RUNNING_COUNTER = (u32*) ARM_TIMER_FR
 #define IRQ_DISABLE_IRQ_2_ADDR (0x2000B220)
 #define IRQ_DISABLE_BASIC_ADDR (0x2000B224)
 
+static volatile u32 * const IRQ_DISABLE_IRQ_1 = (u32*) IRQ_DISABLE_IRQ_1_ADDR;
 static volatile u32 * const IRQ_PENDING_1    = (u32*) IRQ_PENDING_1_ADDR;
 static volatile u32 * const IRQ_ENABLE_IRQ_1 = (u32*) IRQ_ENABLE_IRQ_1_ADDR;
+
+#define _IRQ_DISABLE_IRQ_1_AUX_MASK (1 << 29)
+#define _IRQ_ENABLE_IRQ_1_AUX_MASK  (1 << 29)
 
 //
 // IRQs

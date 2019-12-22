@@ -66,10 +66,10 @@ SetupUART(void)
     *AUX_MU_CNTL = 0;
     *AUX_MU_LCR  = 3;
     *AUX_MU_MCR  = 0;
-    *AUX_MU_IER  = 0;
+    *AUX_MU_IER  = 0x5;
     *AUX_MU_IIR  = 0xC6;
     *AUX_MU_BAUD = BAUD_DIV_115200;
-
+    
     dmb();
 
     SetGPIOMode(GPIO_14, GPIO_ALT5);
@@ -80,41 +80,50 @@ void
 StartUART(void)
 {   
     dmb();
+    
     *AUX_MU_CNTL = 3;
-
-    UART_Flush();
+    
+    while (UART_HasInput())
+    {
+        UART_GetC();
+    }
 }
 
-unsigned int mmu_section ( unsigned int vadd, unsigned int padd, unsigned int flags )
+unsigned int 
+mmu_section(unsigned int vadd, unsigned int padd, unsigned int flags)
 {
     unsigned int ra;
     unsigned int rb;
     unsigned int rc;
 
-    ra=vadd>>20;
-    rb=MMUTABLEBASE|(ra<<2);
-    rc=(padd&0xFFF00000)|0xC00|flags|2;
-    //hexstrings(rb); hexstring(rc);
+    ra = vadd >> 20;
+    rb = MMUTABLEBASE | (ra << 2);
+    rc = (padd & 0xFFF00000) | 0xC00 | flags | 2;
+    
     PUT32(rb,rc);
+    
     return(0);
 }
 
-unsigned int mmu_small ( unsigned int vadd, unsigned int padd, unsigned int flags, unsigned int mmubase )
+unsigned int 
+mmu_small(unsigned int vadd, unsigned int padd, unsigned int flags, unsigned int mmubase)
 {
     unsigned int ra;
     unsigned int rb;
     unsigned int rc;
 
-    ra=vadd>>20;
-    rb=MMUTABLEBASE|(ra<<2);
-    rc=(mmubase&0xFFFFFC00)/*|(domain<<5)*/|1;
-    //hexstrings(rb); hexstring(rc);
-    PUT32(rb,rc); //first level descriptor
-    ra=(vadd>>12)&0xFF;
-    rb=(mmubase&0xFFFFFC00)|(ra<<2);
-    rc=(padd&0xFFFFF000)|(0xFF0)|flags|2;
-    //hexstrings(rb); hexstring(rc);
-    PUT32(rb,rc); //second level descriptor
+    ra = vadd >> 20;
+    rb = MMUTABLEBASE | (ra << 2);
+    rc = (mmubase & 0xFFFFFC00)/*|(domain<<5)*/ | 1;
+    
+    PUT32(rb, rc); //first level descriptor
+    
+    ra = (vadd >> 12) & 0xFF;
+    rb = (mmubase & 0xFFFFFC00) | (ra << 2);
+    rc = (padd & 0xFFFFF000) | (0xFF0) | flags | 2;
+    
+    PUT32(rb, rc); //second level descriptor
+    
     return(0);
 }
 
@@ -132,8 +141,8 @@ c_irq_handler(void)
         {
             // We've received a byte of data
             char c = *AUX_MU_IO;
-            UART_Flush();
-            UART_Printf("Received: %c\n", c);
+            
+            UART_PutC_FAST(c);
         }
     }
 }
@@ -141,53 +150,43 @@ c_irq_handler(void)
 int 
 start()
 {
+    // Disable the mini-uart IRQ during startup
+    *IRQ_DISABLE_IRQ_1 = _IRQ_DISABLE_IRQ_1_AUX_MASK;
+    
+    SetGPIOMode(GPIO_LED, GPIO_OUTPUT);
+    ClearGPIO(GPIO_LED);
+    
     SetupUART();
     StartUART();
 
     u32 ra;
-    for(ra=0;;ra+=0x00100000)
+    for (ra=0;; ra += 0x00100000)
     {
-        mmu_section(ra,ra,0x0000);
-        if(ra==0xFFF00000) break;
+        mmu_section(ra, ra, 0x0000);
+        if (ra == 0xFFF00000) 
+        {
+            break;
+        }
     }
 
-    mmu_section(0x20000000,0x20000000,0x0000); //NOT CACHED!
-    mmu_section(0x20200000,0x20200000,0x0000); //NOT CACHED!
+    mmu_section(0x20000000, 0x20000000, 0x0000); // NOT CACHED!
+    mmu_section(0x20200000, 0x20200000, 0x0000); // NOT CACHED!
 
-    start_mmu(MMUTABLEBASE,0x00000001|0x1000|0x0004); //[23]=0 subpages enabled = legacy ARMv4,v5 and v6
-
+    start_mmu(MMUTABLEBASE, 0x00000001 | 0x1000 | 0x0004); // [23]=0 subpages enabled = legacy ARMv4,v5 and v6
+    
+    
+    *IRQ_ENABLE_IRQ_1 = _IRQ_ENABLE_IRQ_1_AUX_MASK;
+    
     enable_irq();
-
-    SetGPIOMode(GPIO_LED, GPIO_OUTPUT);
-
-    UART_Flush();
-
-    while (UART_IsInput())
-    {
-        UART_GetC();
-    }
 
     char inputBuffer[512];
     while (1)
     {
-        UART_Printf("Ping\r\n");
+        UART_Printf("Ping\n");
         DelayS(1);
-        UART_Printf("Pong\r\n");
+        
+        UART_Printf("Pong\n");
         DelayS(1);
-
-        if (UART_IsInput() != 0)
-        {
-            ClearGPIO(GPIO_LED);
-
-            u32 len = UART_GetS(inputBuffer);
-
-            UART_PutB(inputBuffer, len);
-            UART_PutNewline();
-
-            DelayS(1);
-
-            SetGPIO(GPIO_LED);
-        }
     }
 
     return EXIT_SUCCESS;

@@ -57,7 +57,7 @@ UART_PutB(char *str, u32 size)
 void
 UART_Printf(const char *fmt, ...)
 {
-	char buffer[2048];
+	char buffer[4096];
 
 	va_list args;
 	va_start(args, fmt);
@@ -118,7 +118,7 @@ UART_Flush(void)
 }
 
 u8
-UART_IsInput(void)
+UART_HasInput(void)
 {
 	u8 result = 0;
 

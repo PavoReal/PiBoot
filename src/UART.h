@@ -8,6 +8,7 @@
 
 #define UART_PutNewline() UART_PutC('\r'); UART_PutC('\n')
 
+#define UART_PutC_FAST(c) dmb(); *AUX_MU_IO = (c)
 extern void
 UART_PutC(char c);
 
@@ -36,6 +37,6 @@ extern void
 UART_Flush(void);
 
 extern u8
-UART_IsInput(void);
+UART_HasInput(void);
 
 #endif

@@ -1,0 +1,34 @@
+version(1);
+project_name = "PiBoot";
+
+patterns = {
+"*.c",
+"*.cpp",
+"*.h",
+"*.bat",
+"*.sh",
+"*.4coder",
+"*.txt",
+"*.s"
+};
+blacklist_patterns = {
+".*",
+".\\newlib\\*"
+};
+load_paths_only = {
+ {"."},
+};
+load_paths = {
+ { load_paths_only, .os = "win"  },
+ { load_paths_only, .os = "linux"},
+ { load_paths_only, .os = "mac"  },
+};
+
+command_list = { 
+ { .name = "build",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { {".\\build.bat", .os ="win" },
+           }, },
+};
+
+fkey_command[4] = "build";
