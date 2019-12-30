@@ -8,7 +8,7 @@
 
 #define UART_PutNewline() UART_PutC('\r'); UART_PutC('\n')
 
-#define UART_PutC_FAST(c) dmb(); *AUX_MU_IO = (c)
+#define UART_PutC_FAST(c) *AUX_MU_IO = (c)
 extern void
 UART_PutC(char c);
 
@@ -27,6 +27,7 @@ UART_PutB(char *str, u32 size);
 extern void
 UART_Printf(const char *fmt, ...);
 
+#define UART_GetC_FAST(c)c  = *AUX_MU_IO
 extern char
 UART_GetC(void);
 

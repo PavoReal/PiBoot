@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "Platform.h"
+#include "Bootloader.h"
 
 extern void
 PUT32(u32, u32);
@@ -140,9 +141,85 @@ c_irq_handler(void)
         if (*AUX_MU_IIR & _AUX_MU_IO_REG_RX_MASK)
         {
             // We've received a byte of data
-            char c = *AUX_MU_IO;
             
-            UART_PutC_FAST(c);
+            // Read the byte to remove it from the fifo
+            char c;
+            UART_GetC_FAST(c);
+            
+            UART_Printf("Got byte 0x%x\n", c);
+            
+            switch (rxState)
+            {
+                case (RX_STATE_IDLE):
+                {
+                    rxStateData.command = 0;
+                    rxStateData.commandByteCount = 1;
+                    
+                    rxState = RX_STATE_COMMAND;
+                } break;
+                
+                case (RX_STATE_COMMAND):
+                {
+                    rxStateData.command = rxStateData.command | (u32) ((u32) c << rxStateData.commandByteCount++);
+                    UART_Printf("Got command 0x%04x\n", rxStateData.command);
+                    
+                    if (rxStateData.commandByteCount >= 4)
+                    {
+                        if (rxStateData.command == BOOTLOADER_COMMAND_PRINT_INFO)
+                        {
+                            UART_Puts("Hello! This is PiBoot, a basic bitch bootloader for my team's embedded junior project written by Garrison Peacock!");
+                            
+                            rxState = RX_STATE_IDLE;
+                        }
+                        else if (rxStateData.command == BOOTLOADER_COMMAND_ECHO)
+                        {
+                            rxState = RX_STATE_ECHO;
+                        }
+                        else if (rxStateData.command == BOOTLOADER_COMMAND_ECHO_SIZE)
+                        {
+                            rxStateData.sizeToEcho = 0;
+                            rxStateData.sizeToEchoByteCount = 0;
+                            
+                            rxState = RX_STATE_ECHO_SIZE_GET_SIZE;
+                        }
+                        else
+                        {
+                            UART_Printf("Unknown command 0x%x\n", c);
+                            
+                            rxState = RX_STATE_IDLE;
+                        }
+                    }
+                } break;
+                
+                case (RX_STATE_ECHO_SIZE_GET_SIZE):
+                {
+                    rxStateData.sizeToEcho |= (u32) (c << rxStateData.sizeToEchoByteCount++);
+                    
+                    if (rxStateData.sizeToEchoByteCount >= 4)
+                    {
+                        rxState = RX_STATE_ECHO;
+                        UART_Printf("Will echo %u chars\n", rxStateData.sizeToEcho);
+                    }
+                } break;
+                
+                case (RX_STATE_ECHO_SIZE):
+                {
+                    UART_PutC_FAST(c);
+                    
+                    rxStateData.sizeToEcho -= 1;
+                    if (!rxStateData.sizeToEcho)
+                    {
+                        rxState = RX_STATE_IDLE;
+                    }
+                } break;
+                
+                case (RX_STATE_ECHO):
+                {
+                    UART_PutC_FAST(c);
+                    
+                    rxState = RX_STATE_IDLE;
+                } break;
+            }
         }
     }
 }
@@ -174,19 +251,24 @@ start()
 
     start_mmu(MMUTABLEBASE, 0x00000001 | 0x1000 | 0x0004); // [23]=0 subpages enabled = legacy ARMv4,v5 and v6
     
+    rxState = RX_STATE_IDLE;
+    
+    rxStateData.command = 0;
     
     *IRQ_ENABLE_IRQ_1 = _IRQ_ENABLE_IRQ_1_AUX_MASK;
+    
+    UART_Puts("PiBoot ready and waiting...");
     
     enable_irq();
 
     char inputBuffer[512];
     while (1)
     {
-        UART_Printf("Ping\n");
-        DelayS(1);
+        UART_Printf("Pi Ping\n");
+        DelayS(10);
         
-        UART_Printf("Pong\n");
-        DelayS(1);
+        UART_Printf("Pi Pong\n");
+        DelayS(10);
     }
 
     return EXIT_SUCCESS;

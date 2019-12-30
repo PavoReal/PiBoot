@@ -12,8 +12,10 @@ AS=arm-none-eabi-as
 OBJDUMP=arm-none-eabi-objdump
 OBJCOPY=arm-none-eabi-objcopy
 
+C_DEFS="-DPI_BOOT -DPI_BOOT_INTERNAL"
+
 ASM_FLAGS="--warn --fatal-warnings -mcpu=arm1176jzf-s -mfpu=vfpv2"
-CC_FLAGS="-Wall -Wextra -Werror -O2 -nostartfiles -ffreestanding -mcpu=arm1176jzf-s -mtune=arm1176jzf-s  -I../newlib/libc/include"
+CC_FLAGS="-Wall -Wextra -Werror -O2 -nostartfiles -ffreestanding -mcpu=arm1176jzf-s -mtune=arm1176jzf-s  -I../newlib/libc/include $C_DEFS"
 LD_FLAGS="-lc -lm"
 
 shopt -s nullglob
