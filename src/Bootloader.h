@@ -22,6 +22,7 @@ typedef enum
     RX_STATE_ECHO,
     
     RX_STATE_UPLOAD_GET_SIZE,
+    RX_STATE_UPLOAD_DATA,
 } RXState;
 
 typedef struct
@@ -30,6 +31,9 @@ typedef struct
     
     u32 uploadSize;
     u8 uploadSizeIndex;
+    
+    u8 *uploadIndex;
+    u32 uploadRXSize;
     
 } RXStateData;
 

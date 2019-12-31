@@ -205,10 +205,27 @@ c_irq_handler(void)
                     
                     if (rxStateData.uploadSizeIndex >= 4)
                     {
-                        UART_Printf("Upload size: %u", rxStateData.uploadSize);
+                        UART_Printf("Kernel size: %u", rxStateData.uploadSize);
+                        
+                        rxStateData.uploadIndex    = BOOTLOADER_MEMORY_TARGET;
+                        rxStateData.uploadRXSize   = 0;
+                        
+                        rxState = RX_STATE_UPLOAD_DATA;
+                    }
+                } break;
+                
+                case (RX_STATE_UPLOAD_DATA):
+                {
+                    *rxStateData.uploadIndex++ = input;
+                    rxStateData.uploadRXSize += 1;
+                    
+                    if (rxStateData.uploadRXSize >= rxStateData.uploadSize)
+                    {
+                        UART_Printf("Upload done...");
                         
                         rxState = RX_STATE_IDLE;
                     }
+                    
                 } break;
             }
         }
@@ -257,11 +274,11 @@ start()
     
     while (1)
     {
-        UART_Puts("Pi Ping");
-        DelayS(10);
+        UART_Printf("Pi Ping: %x", *BOOTLOADER_MEMORY_TARGET);
+        DelayS(2);
         
-        UART_Puts("Pi Pong");
-        DelayS(10);
+        UART_Printf("Pi Pong: %x", *(BOOTLOADER_MEMORY_TARGET + 1024));
+        DelayS(2);
     }
 
     return EXIT_SUCCESS;
