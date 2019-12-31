@@ -40,18 +40,21 @@ for i in ../src/*.c; do
     $CC -c $CC_FLAGS $i -o $(basename $i).o
 done
 
-cp ../src/memmap ./
+cp ../src/memmap ./memmap
+cp ../src/memmap-bootloadable ./
 
 list=(*.o)
 
 echo "CC ${list[@]} --> main.elf"
-$CC $CC_FLAGS $LD_FLAGS *.o -o main.elf
+$CC $CC_FLAGS $LD_FLAGS -T memmap *.o -o main.elf
+$CC $CC_FLAGS $LD_FLAGS -T memmap-bootloadable *.o -o main-bootloadable.elf
 
 $OBJDUMP -D main.elf > main.list
-$OBJCOPY --srec-forceS3 main.elf -O srec main.srec
+$OBJDUMP -D main-bootloadable.elf > main-bootloader.list
 
 echo "OBJCOPY main.elf --> kernel.img"
 $OBJCOPY main.elf -O binary kernel.img
+$OBJCOPY main-bootloadable.elf -O binary kernel-bootloadable.img
 
 popd > /dev/null
 echo "Done..."

@@ -3,8 +3,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "Bootloader.h"
+
 void
-UART_PutC(char c)
+UART_Put(u8 c)
 {
 	dmb();
 	
@@ -20,37 +22,22 @@ UART_PutC(char c)
 }
 
 void
-UART_PutError(u32 data)
-{
-	UART_Printf("[FATAL] 0x%0x", data);
-}
-
-void
 UART_Puts(char *str)
 {
 	while (*str)
 	{
-		UART_PutC(*str++);
+		UART_Put(*str++);
 	}
 
-	UART_PutNewline();
+	UART_PutNewlineStop();
 }
 
 void
-UART_PutStr(char *str)
-{
-	while (*str)
-	{
-		UART_PutC(*str++);
-	}
-}
-
-void
-UART_PutB(char *str, u32 size)
+UART_PutB(u8 *str, u32 size)
 {
 	while (size--)
 	{
-		UART_PutC(*str++);
+		UART_Put(*str++);
 	}
 }
 
@@ -64,24 +51,28 @@ UART_Printf(const char *fmt, ...)
 
 	vsprintf(buffer, fmt, args);
 
-	UART_PutStr(buffer);
+	UART_Puts(buffer);
 
 	va_end(args);
 }
 
-char
-UART_GetC(void)
+u8
+UART_Get(void)
 {
+    dmb();
+    
 	while (!(*AUX_MU_LSR & _AUX_ME_LSR_DATA_READY_MASK))
 	{
 		nop();
 	}
-
-	return *AUX_MU_IO;
+    
+    u8 result = *AUX_MU_IO;
+    
+	return result;
 }
 
 u32
-UART_GetS(char *str)
+UART_Gets(char *str)
 {
 	u32 count = 1;
 	char c;
@@ -90,7 +81,7 @@ UART_GetS(char *str)
 
 	while (!done)
 	{
-		c = UART_GetC();
+		c = (char) UART_Get();
 
 		if (c != '\0')
 		{
@@ -111,6 +102,8 @@ UART_GetS(char *str)
 void
 UART_Flush(void)
 {
+    dmb();
+    
 	while(!(*AUX_MU_LSR & _AUX_ME_LSR_TRANS_IDLE_MASK))
 	{
 		nop();
@@ -121,7 +114,9 @@ u8
 UART_HasInput(void)
 {
 	u8 result = 0;
-
+    
+    dmb();
+    
 	result = (*AUX_MU_LSR & _AUX_ME_LSR_DATA_READY_MASK);
 
 	return result;

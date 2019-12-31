@@ -1,16 +1,16 @@
 #if !defined(PI_BOOTLOADER_H)
 #define PI_BOOTLOADER_H
 
-typedef u32 BootloaderCommand;
+typedef u8 BootloaderCommand;
 enum _BootloaderCommand
 {
-    BOOTLOADER_COMMAND_PRINT_INFO,
-    BOOTLOADER_COMMAND_ECHO,
+    BOOTLOADER_COMMAND_UNKNOWN = 0,
     
-    BOOTLOADER_COMMAND_ECHO_SIZE,
+    BOOTLOADER_COMMAND_PRINT_INFO, // Print some happy message
+    BOOTLOADER_COMMAND_ECHO,       // Echo until a zero byte is sent
+    
+    BOOTLOADER_COMMAND_UPLOAD // Send 4 bytes for the size of the kernel then the data
 };
-
-#endif
 
 // The ARM side of things
 #if defined(PI_BOOT)
@@ -18,38 +18,30 @@ enum _BootloaderCommand
 typedef enum
 {
     RX_STATE_IDLE,
-    RX_STATE_COMMAND,
     
     RX_STATE_ECHO,
     
-    RX_STATE_ECHO_SIZE_GET_SIZE,
-    RX_STATE_ECHO_SIZE,
+    RX_STATE_UPLOAD_GET_SIZE,
 } RXState;
 
 typedef struct
 {
-    union
-    {
-        u32 command;
-        u32 sizeToEcho;
-    };
+    u8 command;
     
-    union
-    {
-        u8 commandByteCount;
-        u8 sizeToEchoByteCount;
-    };
+    u32 uploadSize;
+    u8 uploadSizeIndex;
     
 } RXStateData;
 
 GLOBAL RXState rxState;
 GLOBAL RXStateData rxStateData;
 
+GLOBAL u8 * const BOOTLOADER_MEMORY_TARGET = (u8*) 0x06400000;
+
 #endif
 
 // The PC side of things
 #if defined(PI_TERM)
 
-
-
+#endif
 #endif

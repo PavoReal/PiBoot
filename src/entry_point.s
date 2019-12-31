@@ -98,30 +98,9 @@ fiq_handler:
     b handler
 
 handler:
-    mov r4,lr
-    mov sp,#0x00004000
-    bl UART_PutError
-    mov r0,r4
-    bl UART_PutError
     b hang
 
 data_abort:
-    mov r6,lr
-    ldr r8,[r6,#-8]
-    mrc p15,0,r4,c5,c0,0 ;@ data/combined
-    mrc p15,0,r5,c5,c0,1 ;@ instruction
-    mov sp,#0x00004000
-    bl UART_PutError
-    mov r0,r4
-    bl UART_PutError
-    mov r0,r5
-    bl UART_PutError
-    mov r0,r6
-    bl UART_PutError
-    mov r0,r8
-    bl UART_PutError
-    mov r0,r7
-    bl UART_PutError
     b hang
 
 .globl start_mmu

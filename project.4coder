@@ -9,7 +9,8 @@ patterns = {
 "*.sh",
 "*.4coder",
 "*.txt",
-"*.s"
+"*.s",
+"memmap*"
 };
 blacklist_patterns = {
 ".*",

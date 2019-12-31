@@ -86,7 +86,7 @@ StartUART(void)
     
     while (UART_HasInput())
     {
-        UART_GetC();
+        UART_Get();
     }
 }
 
@@ -143,81 +143,72 @@ c_irq_handler(void)
             // We've received a byte of data
             
             // Read the byte to remove it from the fifo
-            char c;
-            UART_GetC_FAST(c);
+             u8 input;
+            UART_Get_FAST(input);
             
-            UART_Printf("Got byte 0x%x\n", c);
+            #if 0
+            UART_Printf("CS: %u, RX: %u\n", rxState, input);
+            #endif
             
             switch (rxState)
             {
                 case (RX_STATE_IDLE):
                 {
-                    rxStateData.command = 0;
-                    rxStateData.commandByteCount = 1;
+                    rxStateData.command = input;
                     
-                    rxState = RX_STATE_COMMAND;
-                } break;
-                
-                case (RX_STATE_COMMAND):
-                {
-                    rxStateData.command = rxStateData.command | (u32) ((u32) c << rxStateData.commandByteCount++);
-                    UART_Printf("Got command 0x%04x\n", rxStateData.command);
-                    
-                    if (rxStateData.commandByteCount >= 4)
+                    switch (rxStateData.command)
                     {
-                        if (rxStateData.command == BOOTLOADER_COMMAND_PRINT_INFO)
+                        case BOOTLOADER_COMMAND_PRINT_INFO:
                         {
                             UART_Puts("Hello! This is PiBoot, a basic bitch bootloader for my team's embedded junior project written by Garrison Peacock!");
                             
                             rxState = RX_STATE_IDLE;
-                        }
-                        else if (rxStateData.command == BOOTLOADER_COMMAND_ECHO)
+                        } break;
+                        
+                        case BOOTLOADER_COMMAND_ECHO:
                         {
                             rxState = RX_STATE_ECHO;
-                        }
-                        else if (rxStateData.command == BOOTLOADER_COMMAND_ECHO_SIZE)
+                        } break;
+                        
+                        case BOOTLOADER_COMMAND_UPLOAD:
                         {
-                            rxStateData.sizeToEcho = 0;
-                            rxStateData.sizeToEchoByteCount = 0;
+                            rxStateData.uploadSize      = 0;
+                            rxStateData.uploadSizeIndex = 0;
                             
-                            rxState = RX_STATE_ECHO_SIZE_GET_SIZE;
-                        }
-                        else
+                            rxState = RX_STATE_UPLOAD_GET_SIZE;
+                        } break;
+                        
+                        case BOOTLOADER_COMMAND_UNKNOWN:
+                        default:
                         {
-                            UART_Printf("Unknown command 0x%x\n", c);
+                            UART_Printf("Unknown command 0x%x", input);
                             
                             rxState = RX_STATE_IDLE;
-                        }
-                    }
-                } break;
-                
-                case (RX_STATE_ECHO_SIZE_GET_SIZE):
-                {
-                    rxStateData.sizeToEcho |= (u32) (c << rxStateData.sizeToEchoByteCount++);
-                    
-                    if (rxStateData.sizeToEchoByteCount >= 4)
-                    {
-                        rxState = RX_STATE_ECHO;
-                        UART_Printf("Will echo %u chars\n", rxStateData.sizeToEcho);
-                    }
-                } break;
-                
-                case (RX_STATE_ECHO_SIZE):
-                {
-                    UART_PutC_FAST(c);
-                    
-                    rxStateData.sizeToEcho -= 1;
-                    if (!rxStateData.sizeToEcho)
-                    {
-                        rxState = RX_STATE_IDLE;
+                        } break;
                     }
                 } break;
                 
                 case (RX_STATE_ECHO):
                 {
-                    UART_PutC_FAST(c);
+                        UART_Put_FAST(input);
                     
-                    rxState = RX_STATE_IDLE;
+                    if (input == '\0')
+                    {
+                        rxState = RX_STATE_IDLE;
+                    }
+                } break;
+                
+                case (RX_STATE_UPLOAD_GET_SIZE):
+                {
+                    rxStateData.uploadSize |= ((u32) input << (rxStateData.uploadSizeIndex * 8));
+                    rxStateData.uploadSizeIndex += 1;
+                    
+                    if (rxStateData.uploadSizeIndex >= 4)
+                    {
+                        UART_Printf("Upload size: %u", rxStateData.uploadSize);
+                        
+                        rxState = RX_STATE_IDLE;
+                    }
                 } break;
             }
         }
@@ -235,7 +226,7 @@ start()
     
     SetupUART();
     StartUART();
-
+    
     u32 ra;
     for (ra=0;; ra += 0x00100000)
     {
@@ -251,23 +242,25 @@ start()
 
     start_mmu(MMUTABLEBASE, 0x00000001 | 0x1000 | 0x0004); // [23]=0 subpages enabled = legacy ARMv4,v5 and v6
     
-    rxState = RX_STATE_IDLE;
+    UART_Puts("MMU configured...");
     
+    rxState = RX_STATE_IDLE;
     rxStateData.command = 0;
+    
+    UART_Puts("Bootloader state configured...");
     
     *IRQ_ENABLE_IRQ_1 = _IRQ_ENABLE_IRQ_1_AUX_MASK;
     
     UART_Puts("PiBoot ready and waiting...");
     
     enable_irq();
-
-    char inputBuffer[512];
+    
     while (1)
     {
-        UART_Printf("Pi Ping\n");
+        UART_Puts("Pi Ping");
         DelayS(10);
         
-        UART_Printf("Pi Pong\n");
+        UART_Puts("Pi Pong");
         DelayS(10);
     }
 
