@@ -160,7 +160,7 @@ c_irq_handler(void)
                     {
                         case BOOTLOADER_COMMAND_PRINT_INFO:
                         {
-                            UART_Puts("Hello! This is PiBoot, a basic bitch bootloader for my team's embedded junior project written by Garrison Peacock!");
+                            UART_Puts("Hello! This is PiBoot, a basic bitch bootloader for my team's embedded junior project written by Garrison Peacock.");
                             
                             rxState = RX_STATE_IDLE;
                         } break;

@@ -50,7 +50,7 @@ $CC $CC_FLAGS $LD_FLAGS -T memmap *.o -o main.elf
 $CC $CC_FLAGS $LD_FLAGS -T memmap-bootloadable *.o -o main-bootloadable.elf
 
 $OBJDUMP -D main.elf > main.list
-$OBJDUMP -D main-bootloadable.elf > main-bootloader.list
+$OBJDUMP -D main-bootloadable.elf > main-bootloadable.list
 
 echo "OBJCOPY main.elf --> kernel.img"
 $OBJCOPY main.elf -O binary kernel.img
