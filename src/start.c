@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "Platform.h"
 #include "Bootloader.h"
@@ -207,10 +208,41 @@ c_irq_handler(void)
                     {
                         UART_Printf("Kernel size: %u", rxStateData.uploadSize);
                         
+                        rxStateData.uploadIndex     = 0;
+                        rxStateData.uploadSizeIndex = 0;
+                        rxStateData.uploadRXSize    = 0;
+                        
+                        for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
+                        {
+                            rxStateData.checksum[i] = 0;
+                        }
+                        
+                        rxState = RX_STATE_UPLOAD_GET_CHECKSUM;
+                    }
+                } break;
+                
+                case (RX_STATE_UPLOAD_GET_CHECKSUM):
+                {
+                    rxStateData.checksum[rxStateData.uploadSizeIndex++] = input;
+                    
+                    if (rxStateData.uploadSizeIndex >= SHA1_DIGEST_SIZE)
+                    {
+                        UART_Puts("Kernel checksum: 0x");
+                        
+                        char tmpBuffer[4096];
+                        sprintf(tmpBuffer, "0x");
+                        
+                        for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
+                        {
+                            sprintf(tmpBuffer + strlen(tmpBuffer), "%x%x", rxStateData.checksum[i] / 16, rxStateData.checksum[i] % 16);
+                        }
+                        
+                        UART_Puts(tmpBuffer);
+                        
                         rxStateData.uploadIndex    = BOOTLOADER_MEMORY_TARGET;
                         rxStateData.uploadRXSize   = 0;
                         
-                        rxState = RX_STATE_UPLOAD_DATA;
+                        rxState = RX_STATE_IDLE;
                     }
                 } break;
                 

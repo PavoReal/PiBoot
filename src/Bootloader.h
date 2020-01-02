@@ -15,6 +15,8 @@ enum _BootloaderCommand
 // The ARM side of things
 #if defined(PI_BOOT)
 
+#include "libsha1.h"
+
 typedef enum
 {
     RX_STATE_IDLE,
@@ -22,6 +24,7 @@ typedef enum
     RX_STATE_ECHO,
     
     RX_STATE_UPLOAD_GET_SIZE,
+    RX_STATE_UPLOAD_GET_CHECKSUM,
     RX_STATE_UPLOAD_DATA,
 } RXState;
 
@@ -34,6 +37,8 @@ typedef struct
     
     u8 *uploadIndex;
     u32 uploadRXSize;
+    
+    u8 checksum[SHA1_DIGEST_SIZE];
     
 } RXStateData;
 
