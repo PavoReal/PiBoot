@@ -14,7 +14,8 @@ patterns = {
 };
 blacklist_patterns = {
 ".*",
-".\\newlib\\*"
+".\\newlib\\*",
+".\\build\\*"
 };
 load_paths_only = {
  {"."},
