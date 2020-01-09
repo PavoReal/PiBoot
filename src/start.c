@@ -129,27 +129,10 @@ mmu_small(unsigned int vadd, unsigned int padd, unsigned int flags, unsigned int
     return(0);
 }
 
-inline void
-SHA1ChecksumToString(char *str, u8 *checksum)
-{
-    for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
-    {
-        sprintf(str + strlen(str), "%x%x", checksum[i] / 16, checksum[i] % 16);
-    }
-}
-
-inline int
-CheckSHA1(u8 *a, u8 *b)
-{
-    int result = memcmp(a, b, SHA1_DIGEST_SIZE);
-    
-    return result;
-}
-
 void
 c_irq_handler(void)
 {
-    while(1) 
+    while (1) 
     {
         if ((*AUX_MU_IIR & _AUX_MU_IO_REG_INT_PENDING_MASK))
         {
@@ -161,215 +144,25 @@ c_irq_handler(void)
             // We've received a byte of data
             
             // Read the byte to remove it from the fifo
-             u8 input;
+            u8 input;
             UART_Get_FAST(input);
+
+
             
-            #if 0
-            UART_Printf("CS: %u, RX: %u\n", rxState, input);
-            #endif
-            
-            switch (rxState)
-            {
-                case (RX_STATE_IDLE):
-                {
-                    rxStateData.command = input;
-                    
-                    switch (rxStateData.command)
-                    {
-                        case BOOTLOADER_COMMAND_PRINT_INFO:
-                        {
-                            UART_Puts("Hello! This is PiBoot, a basic bitch bootloader for my team's embedded junior project written by Garrison Peacock.");
-                            
-                            rxState = RX_STATE_IDLE;
-                        } break;
-                        
-                        case BOOTLOADER_COMMAND_ECHO:
-                        {
-                            rxState = RX_STATE_ECHO;
-                        } break;
-                        
-                        case BOOTLOADER_COMMAND_UPLOAD:
-                        {
-                            rxStateData.totalFileSize        = 0;
-                            rxStateData.helperIndex          = 0;
-                            rxStateData.lastFileWorkingIndex = BOOTLOADER_MEMORY_TARGET;
-                            rxStateData.fileWorkingIndex     = BOOTLOADER_MEMORY_TARGET;
-                            rxStateData.fileStopIndex        = BOOTLOADER_MEMORY_TARGET;
-                            rxStateData.rxFileSize           = 0;
-                            rxStateData.chunkCount           = 0;
-                            
-                            for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
-                            {
-                                rxStateData.totalChecksum[i]   = 0;
-                                rxStateData.workingChecksum[i] = 0;
-                            }
-                            
-                            rxState = RX_STATE_UPLOAD_GET_SIZE;
-                            UART_Put(BOOTLOADER_COMMAND_AWK);
-                        } break;
-                        
-                        case BOOTLOADER_COMMAND_UNKNOWN:
-                        default:
-                        {
-                            UART_Printf("Unknown command 0x%x", input);
-                            
-                            rxState = RX_STATE_IDLE;
-                        } break;
-                    }
-                } break;
-                
-                case (RX_STATE_ECHO):
-                {
-                    UART_Put_FAST(input);
-                    
-                    if (input == '\0')
-                    {
-                        rxState = RX_STATE_IDLE;
-                    }
-                } break;
-                
-                case (RX_STATE_UPLOAD_GET_SIZE):
-                {
-                    rxStateData.totalFileSize |= ((u32) input << (rxStateData.helperIndex * 8));
-                    rxStateData.helperIndex += 1;
-                    
-                    if (rxStateData.helperIndex >= 4)
-                    {
-                        rxStateData.helperIndex = 0;
-                        rxStateData.chunkCount  = (rxStateData.totalFileSize / BOOTLOADER_CHUNK_SIZE) + 1;
-                        
-                        rxState = RX_STATE_UPLOAD_GET_WHOLE_CHECKSUM;
-                        UART_Put(BOOTLOADER_COMMAND_AWK);
-                    }
-                } break;
-                
-                case (RX_STATE_UPLOAD_GET_WHOLE_CHECKSUM):
-                {
-                    rxStateData.totalChecksum[rxStateData.helperIndex++] = input;
-                    
-                    if (rxStateData.helperIndex >= (SHA1_DIGEST_SIZE))
-                    {
-                        rxStateData.helperIndex = 0;
-                        
-                        rxState = RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM;
-                        UART_Put(BOOTLOADER_COMMAND_AWK);
-                    }
-                } break;
-                
-                case (RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM):
-                {
-                    rxStateData.workingChecksum[rxStateData.helperIndex++] = input;
-                    
-                    if (rxStateData.helperIndex >= (SHA1_DIGEST_SIZE))
-                    {
-                        rxStateData.helperIndex = 0;
-                        
-                        if (rxStateData.chunkCount > 1)
-                        {
-                            rxStateData.fileStopIndex += BOOTLOADER_CHUNK_SIZE;
-                        }
-                        else
-                        {
-                            rxStateData.fileStopIndex += rxStateData.totalFileSize - (rxStateData.rxFileSize);
-                        }
-                        
-                        rxState = RX_STATE_UPLOAD_GET_CHUNK_DATA;
-                        UART_Put(BOOTLOADER_COMMAND_AWK);
-                        
-                        #if 0
-                        char tmp1[1024];
-                        char tmp2[1024];
-                        
-                        sprintf(tmp1, "0x");
-                        strcpy(tmp2, tmp1);
-                        
-                        SHA1ChecksumToString(tmp1, rxStateData.totalChecksum);
-                        SHA1ChecksumToString(tmp2, rxStateData.workingChecksum);
-                        
-                        UART_Printf("Kernel size: %u\nKernel checksum: %s\nKernel chunk count: %u\nChunk checksum: %s", rxStateData.totalFileSize, tmp1, rxStateData.chunkCount, tmp2);
-                        #endif
-                    }
-                } break;
-                
-                case (RX_STATE_UPLOAD_GET_CHUNK_DATA):
-                {
-                    *rxStateData.fileWorkingIndex = input;
-                    rxStateData.fileWorkingIndex  += 1;
-
-                    if (rxStateData.fileWorkingIndex >= rxStateData.fileStopIndex)
-                    {
-                        // Check against checksum
-                        
-                        u8 check[SHA1_DIGEST_SIZE];
-                        sha1(check, rxStateData.lastFileWorkingIndex, rxStateData.fileStopIndex - rxStateData.lastFileWorkingIndex);
-                        
-                        if (CheckSHA1(check, rxStateData.workingChecksum))
-                        {
-                            // Mismatch -- error during transmission
-                            
-                            rxStateData.fileWorkingIndex = rxStateData.lastFileWorkingIndex;
-                            for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
-                            {
-                                rxStateData.workingChecksum[i] = 0;
-                            }
-                            rxState = RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM;
-
-                            UART_Put(BOOTLOADER_COMMAND_ERR);
-                        }
-                        else
-                        {
-                            rxStateData.chunkCount -= 1;
-                            rxStateData.rxFileSize += (rxStateData.fileWorkingIndex - rxStateData.lastFileWorkingIndex);
-
-                            if (rxStateData.chunkCount)
-                            {
-                                
-                                rxStateData.lastFileWorkingIndex = rxStateData.fileWorkingIndex;
-                                rxState = RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM;
-                                
-                                UART_Put(BOOTLOADER_COMMAND_AWK);
-                            }
-                            else
-                            {
-                                // We're done! Woot!
-                                
-                                UART_Put(BOOTLOADER_COMMAND_AWK);
-                                
-                                sha1(check, BOOTLOADER_MEMORY_TARGET, rxStateData.totalFileSize);
-                                if (CheckSHA1(check, rxStateData.totalChecksum))
-                                {
-                                    UART_Puts("Error! Checksums don't match! Try checking the connection and retrying...");
-                                }
-                                else
-                                {
-                                    UART_Puts("Received the kernel! PiBoot is now branching, goodbye for now!");
-
-                                    asm_branch(BOOTLOADER_MEMORY_TARGET);
-                                }
-                                    
-                                rxState = RX_STATE_IDLE;
-                            }
-                        }
-                    }
-                } break;
-            }
         }
     }
 }
 
-int 
-start()
+void
+init_system(void)
 {
-    // Disable the mini-uart IRQ during startup
+ // Disable the mini-uart IRQ during startup
     *IRQ_DISABLE_IRQ_1 = _IRQ_DISABLE_IRQ_1_AUX_MASK;
-    
-    SetGPIOMode(GPIO_LED, GPIO_OUTPUT);
-    ClearGPIO(GPIO_LED);
     
     SetupUART();
     StartUART();
-    
-    u32 ra;
+
+     u32 ra;
     for (ra=0;; ra += 0x00100000)
     {
         mmu_section(ra, ra, 0x0000);
@@ -383,31 +176,26 @@ start()
     mmu_section(0x20200000, 0x20200000, 0x0000); // NOT CACHED!
 
     start_mmu(MMUTABLEBASE, 0x00000001 | 0x1000 | 0x0004); // [23]=0 subpages enabled = legacy ARMv4,v5 and v6
-    
-    rxState = RX_STATE_IDLE;
-    rxStateData.command = 0;
-    
+
     *IRQ_ENABLE_IRQ_1 = _IRQ_ENABLE_IRQ_1_AUX_MASK;
-    
-    UART_Puts("PiBoot ready and waiting...");
-    
+
     enable_irq();
+}
+
+int 
+start()
+{
+    init_system();
     
-    while (1)
+    //start here
+
+    SetGPIOMode(GPIO_4, GPIO_INPUT);
+
+    while(1)
     {
-#if defined(IS_BOOTLOADER)
-        nop();
-#else
-        SetGPIO(GPIO_LED);
-        UART_Puts("Ping");
+        UART_Printf("Hello!");
 
         DelayS(1);
-
-        ClearGPIO(GPIO_LED);
-        UART_Puts("Pong");
-
-        DelayS(1);
-#endif
     }
 
     return EXIT_SUCCESS;
