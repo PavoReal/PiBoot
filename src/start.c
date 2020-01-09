@@ -129,6 +129,23 @@ mmu_small(unsigned int vadd, unsigned int padd, unsigned int flags, unsigned int
     return(0);
 }
 
+inline void
+SHA1ChecksumToString(char *str, u8 *checksum)
+{
+    for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
+    {
+        sprintf(str + strlen(str), "%x%x", checksum[i] / 16, checksum[i] % 16);
+    }
+}
+
+inline int
+CheckSHA1(u8 *a, u8 *b)
+{
+    int result = memcmp(a, b, SHA1_DIGEST_SIZE);
+    
+    return result;
+}
+
 void
 c_irq_handler(void)
 {
@@ -173,10 +190,22 @@ c_irq_handler(void)
                         
                         case BOOTLOADER_COMMAND_UPLOAD:
                         {
-                            rxStateData.uploadSize      = 0;
-                            rxStateData.uploadSizeIndex = 0;
+                            rxStateData.totalFileSize        = 0;
+                            rxStateData.helperIndex          = 0;
+                            rxStateData.lastFileWorkingIndex = BOOTLOADER_MEMORY_TARGET;
+                            rxStateData.fileWorkingIndex     = BOOTLOADER_MEMORY_TARGET;
+                            rxStateData.fileStopIndex        = BOOTLOADER_MEMORY_TARGET;
+                            rxStateData.rxFileSize           = 0;
+                            rxStateData.chunkCount           = 0;
+                            
+                            for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
+                            {
+                                rxStateData.totalChecksum[i]   = 0;
+                                rxStateData.workingChecksum[i] = 0;
+                            }
                             
                             rxState = RX_STATE_UPLOAD_GET_SIZE;
+                            UART_Put(BOOTLOADER_COMMAND_AWK);
                         } break;
                         
                         case BOOTLOADER_COMMAND_UNKNOWN:
@@ -201,63 +230,124 @@ c_irq_handler(void)
                 
                 case (RX_STATE_UPLOAD_GET_SIZE):
                 {
-                    rxStateData.uploadSize |= ((u32) input << (rxStateData.uploadSizeIndex * 8));
-                    rxStateData.uploadSizeIndex += 1;
+                    rxStateData.totalFileSize |= ((u32) input << (rxStateData.helperIndex * 8));
+                    rxStateData.helperIndex += 1;
                     
-                    if (rxStateData.uploadSizeIndex >= 4)
+                    if (rxStateData.helperIndex >= 4)
                     {
-                        UART_Printf("Kernel size: %u", rxStateData.uploadSize);
+                        rxStateData.helperIndex = 0;
+                        rxStateData.chunkCount  = (rxStateData.totalFileSize / BOOTLOADER_CHUNK_SIZE) + 1;
                         
-                        rxStateData.uploadIndex     = 0;
-                        rxStateData.uploadSizeIndex = 0;
-                        rxStateData.uploadRXSize    = 0;
-                        
-                        for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
-                        {
-                            rxStateData.checksum[i] = 0;
-                        }
-                        
-                        rxState = RX_STATE_UPLOAD_GET_CHECKSUM;
+                        rxState = RX_STATE_UPLOAD_GET_WHOLE_CHECKSUM;
+                        UART_Put(BOOTLOADER_COMMAND_AWK);
                     }
                 } break;
                 
-                case (RX_STATE_UPLOAD_GET_CHECKSUM):
+                case (RX_STATE_UPLOAD_GET_WHOLE_CHECKSUM):
                 {
-                    rxStateData.checksum[rxStateData.uploadSizeIndex++] = input;
+                    rxStateData.totalChecksum[rxStateData.helperIndex++] = input;
                     
-                    if (rxStateData.uploadSizeIndex >= SHA1_DIGEST_SIZE)
+                    if (rxStateData.helperIndex >= (SHA1_DIGEST_SIZE))
                     {
-                        UART_Puts("Kernel checksum: 0x");
+                        rxStateData.helperIndex = 0;
                         
-                        char tmpBuffer[4096];
-                        sprintf(tmpBuffer, "0x");
-                        
-                        for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
-                        {
-                            sprintf(tmpBuffer + strlen(tmpBuffer), "%x%x", rxStateData.checksum[i] / 16, rxStateData.checksum[i] % 16);
-                        }
-                        
-                        UART_Puts(tmpBuffer);
-                        
-                        rxStateData.uploadIndex    = BOOTLOADER_MEMORY_TARGET;
-                        rxStateData.uploadRXSize   = 0;
-                        
-                        rxState = RX_STATE_IDLE;
+                        rxState = RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM;
+                        UART_Put(BOOTLOADER_COMMAND_AWK);
                     }
                 } break;
                 
-                case (RX_STATE_UPLOAD_DATA):
+                case (RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM):
                 {
-                    *rxStateData.uploadIndex++ = input;
-                    rxStateData.uploadRXSize += 1;
+                    rxStateData.workingChecksum[rxStateData.helperIndex++] = input;
                     
-                    if (rxStateData.uploadRXSize >= rxStateData.uploadSize)
+                    if (rxStateData.helperIndex >= (SHA1_DIGEST_SIZE))
                     {
-                        UART_Printf("Upload done...");
+                        rxStateData.helperIndex = 0;
                         
-                        rxState = RX_STATE_IDLE;
+                        if (rxStateData.chunkCount > 1)
+                        {
+                            rxStateData.fileStopIndex += BOOTLOADER_CHUNK_SIZE;
+                        }
+                        else
+                        {
+                            rxStateData.fileStopIndex += rxStateData.totalFileSize;
+                        }
+                        
+                        rxState = RX_STATE_UPLOAD_GET_CHUNK_DATA;
+                        UART_Put(BOOTLOADER_COMMAND_AWK);
+                        
+                        #if 0
+                        char tmp1[1024];
+                        char tmp2[1024];
+                        
+                        sprintf(tmp1, "0x");
+                        strcpy(tmp2, tmp1);
+                        
+                        SHA1ChecksumToString(tmp1, rxStateData.totalChecksum);
+                        SHA1ChecksumToString(tmp2, rxStateData.workingChecksum);
+                        
+                        UART_Printf("Kernel size: %u\nKernel checksum: %s\nKernel chunk count: %u\nChunk checksum: %s", rxStateData.totalFileSize, tmp1, rxStateData.chunkCount, tmp2);
+                        #endif
                     }
+                } break;
+                
+                case (RX_STATE_UPLOAD_GET_CHUNK_DATA):
+                {
+                    *rxStateData.fileWorkingIndex++ = input;
                     
+                    if (rxStateData.fileWorkingIndex >= rxStateData.fileStopIndex)
+                    {
+                        // Check against checksum
+                        
+                        u8 check[SHA1_DIGEST_SIZE];
+                        sha1(check, rxStateData.lastFileWorkingIndex, rxStateData.fileStopIndex - rxStateData.lastFileWorkingIndex);
+                        
+                        if (CheckSHA1(check, rxStateData.workingChecksum))
+                        {
+                            // Mismatch -- error during transmission
+                            
+                            rxStateData.fileWorkingIndex = rxStateData.lastFileWorkingIndex;
+                            
+                            UART_Put(BOOTLOADER_COMMAND_ERR);
+                        }
+                        else
+                        {
+                            if (--rxStateData.chunkCount)
+                            {
+                                if (rxStateData.chunkCount > 1)
+                                {
+                                    rxStateData.fileStopIndex += BOOTLOADER_CHUNK_SIZE;
+                                }
+                                else
+                                {
+                                    rxStateData.fileStopIndex += rxStateData.totalFileSize;
+                                }
+                                
+                                rxStateData.lastFileWorkingIndex = rxStateData.fileWorkingIndex;
+                                rxState = RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM;
+                                
+                                UART_Put(BOOTLOADER_COMMAND_AWK);
+                            }
+                            else
+                            {
+                                // We're done! Woot!
+                                
+                                UART_Put(BOOTLOADER_COMMAND_AWK);
+                                
+                                sha1(check, BOOTLOADER_MEMORY_TARGET, rxStateData.totalFileSize);
+                                if (CheckSHA1(check, rxStateData.totalChecksum))
+                                {
+                                    UART_Puts("Error! Resend kernel!");
+                                }
+                                else
+                                {
+                                    UART_Puts("Received the kernel! PiBoot is now branching, goodbye for now!");
+                                }
+                                    
+                                rxState = RX_STATE_IDLE;
+                            }
+                        }
+                    }
                 } break;
             }
         }
@@ -291,12 +381,8 @@ start()
 
     start_mmu(MMUTABLEBASE, 0x00000001 | 0x1000 | 0x0004); // [23]=0 subpages enabled = legacy ARMv4,v5 and v6
     
-    UART_Puts("MMU configured...");
-    
     rxState = RX_STATE_IDLE;
     rxStateData.command = 0;
-    
-    UART_Puts("Bootloader state configured...");
     
     *IRQ_ENABLE_IRQ_1 = _IRQ_ENABLE_IRQ_1_AUX_MASK;
     
@@ -306,11 +392,7 @@ start()
     
     while (1)
     {
-        UART_Printf("Pi Ping: %x", *BOOTLOADER_MEMORY_TARGET);
-        DelayS(2);
-        
-        UART_Printf("Pi Pong: %x", *(BOOTLOADER_MEMORY_TARGET + 1024));
-        DelayS(2);
+        nop();
     }
 
     return EXIT_SUCCESS;
