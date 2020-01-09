@@ -149,6 +149,10 @@ GET32:
     ldr r0,[r0]
     bx lr
 
+.global asm_branch
+asm_branch:
+    bx r0
+
 //
 // Simply returns
 //

@@ -69,6 +69,9 @@ typedef unsigned int uint;
 extern void 
 nop();
 
+extern void
+asm_branch(void *);
+
 /// @}
 /// \addtogroup Peripherals
 /// @{

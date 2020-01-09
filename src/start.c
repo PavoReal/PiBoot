@@ -343,6 +343,8 @@ c_irq_handler(void)
                                 else
                                 {
                                     UART_Puts("Received the kernel! PiBoot is now branching, goodbye for now!");
+
+                                    asm_branch(BOOTLOADER_MEMORY_TARGET);
                                 }
                                     
                                 rxState = RX_STATE_IDLE;
@@ -393,7 +395,19 @@ start()
     
     while (1)
     {
+#if defined(IS_BOOTLOADER)
         nop();
+#else
+        SetGPIO(GPIO_LED);
+        UART_Puts("Ping");
+
+        DelayS(1);
+
+        ClearGPIO(GPIO_LED);
+        UART_Puts("Pong");
+
+        DelayS(1);
+#endif
     }
 
     return EXIT_SUCCESS;
