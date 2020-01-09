@@ -16,7 +16,7 @@ enum _BootloaderCommand
 };
 
 #define BOOTLOADER_CHUNK_COUNT_SIZE (4)
-#define BOOTLOADER_CHUNK_SIZE (100)
+#define BOOTLOADER_CHUNK_SIZE (KILOBYTES(10))
 #define BOOTLOADER_RETRY_MAX (10)
 
 // The ARM side of things

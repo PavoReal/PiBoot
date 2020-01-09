@@ -5,6 +5,8 @@
 
 #define UNUSED(a) (void) a
 
+#define KILOBYTES(a) ((a) * 1024)
+
 #include "BCM2835.h"
 #include "GPIO.h"
 #include "UART.h"

@@ -220,7 +220,7 @@ c_irq_handler(void)
                 
                 case (RX_STATE_ECHO):
                 {
-                        UART_Put_FAST(input);
+                    UART_Put_FAST(input);
                     
                     if (input == '\0')
                     {
@@ -270,7 +270,7 @@ c_irq_handler(void)
                         }
                         else
                         {
-                            rxStateData.fileStopIndex += rxStateData.totalFileSize;
+                            rxStateData.fileStopIndex += rxStateData.totalFileSize - (rxStateData.rxFileSize);
                         }
                         
                         rxState = RX_STATE_UPLOAD_GET_CHUNK_DATA;
@@ -293,8 +293,9 @@ c_irq_handler(void)
                 
                 case (RX_STATE_UPLOAD_GET_CHUNK_DATA):
                 {
-                    *rxStateData.fileWorkingIndex++ = input;
-                    
+                    *rxStateData.fileWorkingIndex = input;
+                    rxStateData.fileWorkingIndex  += 1;
+
                     if (rxStateData.fileWorkingIndex >= rxStateData.fileStopIndex)
                     {
                         // Check against checksum
@@ -307,21 +308,21 @@ c_irq_handler(void)
                             // Mismatch -- error during transmission
                             
                             rxStateData.fileWorkingIndex = rxStateData.lastFileWorkingIndex;
-                            
+                            for (int i = 0; i < SHA1_DIGEST_SIZE; ++i)
+                            {
+                                rxStateData.workingChecksum[i] = 0;
+                            }
+                            rxState = RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM;
+
                             UART_Put(BOOTLOADER_COMMAND_ERR);
                         }
                         else
                         {
-                            if (--rxStateData.chunkCount)
+                            rxStateData.chunkCount -= 1;
+                            rxStateData.rxFileSize += (rxStateData.fileWorkingIndex - rxStateData.lastFileWorkingIndex);
+
+                            if (rxStateData.chunkCount)
                             {
-                                if (rxStateData.chunkCount > 1)
-                                {
-                                    rxStateData.fileStopIndex += BOOTLOADER_CHUNK_SIZE;
-                                }
-                                else
-                                {
-                                    rxStateData.fileStopIndex += rxStateData.totalFileSize;
-                                }
                                 
                                 rxStateData.lastFileWorkingIndex = rxStateData.fileWorkingIndex;
                                 rxState = RX_STATE_UPLOAD_GET_CHUNK_CHECKSUM;
@@ -337,7 +338,7 @@ c_irq_handler(void)
                                 sha1(check, BOOTLOADER_MEMORY_TARGET, rxStateData.totalFileSize);
                                 if (CheckSHA1(check, rxStateData.totalChecksum))
                                 {
-                                    UART_Puts("Error! Resend kernel!");
+                                    UART_Puts("Error! Checksums don't match! Try checking the connection and retrying...");
                                 }
                                 else
                                 {
